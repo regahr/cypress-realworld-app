@@ -92,3 +92,42 @@ behaviour end to end.
 **What I deliberately did not touch.** `loginByApi`, `logoutByXstate`, `switchUserByXstate`, and every
 existing spec. No existing test was modified to use the new command — adding it is the issue; adopting
 it everywhere is not.
+
+## #1555 — migrate `TransactionInfiniteList` off `react-virtualized`
+
+**What was wrong.** `react-virtualized` calls `ReactDOM.findDOMNode`, which React 19 removed, so the
+transaction feed's virtualized list blocks the React upgrade. The dependency was also carrying a
+local patch, `patches/react-virtualized+9.22.5.patch`, applied on every install purely to comment out
+a broken import inside the package — a standing maintenance cost for a library that is already a
+dead end.
+
+**Why this fix.** `react-window` + `react-window-infinite-loader` are by the same author and model
+virtualization the same way, so every API this component actually used maps 1:1 —
+`isRowLoaded`→`isItemLoaded`, `loadMoreRows`→`loadMoreItems`, `rowCount`→`itemCount`,
+`rowHeight`→`itemSize`, `registerChild`→`ref`. That makes this a port rather than a rewrite, which is
+what keeps it inside the "minimal and surgical" rule for a change that necessarily swaps a dependency.
+Both packages are pinned to v1: react-window v2 is a different API surface, and adopting it here would
+be a redesign rather than a migration.
+
+**How the DOM contract was preserved.** `cypress/tests/ui/transaction-feeds.spec.ts:203` paginates by
+scrolling `cy.getBySel("transaction-list").children()`, so the element carrying
+`data-test="transaction-list"` has to stay and the list's scroll container has to remain its direct
+child. Since `react-window-infinite-loader`'s `InfiniteLoader` renders no DOM of its own, the
+`styled()` wrapper moved off the loader and onto that div with its five declarations unchanged. The
+responsive `height`/`width`/`itemSize` math, the `removePx` helper, the `useMediaQuery` breakpoints,
+the `itemCount` formula, `threshold={2}` and the `loadMoreItems` promise are all carried over verbatim.
+The row renderer is now typed with `ListChildComponentProps`, which let the previous `// @ts-ignore`
+go without any behavioural change.
+
+**Result.** The UI suite went from 47 passing / 11 failing to **48 passing / 10 failing**, with **no
+new failures**. The test that recovered is "paginates public transaction feed" — the one that scrolls
+the virtualized list — so the migration fixed a pre-existing red rather than merely avoiding one.
+
+**What I deliberately did not touch.** `src/components/TransactionList.tsx` (the only consumer) keeps
+the identical props interface and default export; the `patches/` directory and the `postinstall`
+script remain for future patches; no test was modified to accommodate the new library.
+
+**Not fixed, and named honestly.** The other 10 UI failures are pre-existing and unrelated to this
+change — every one fails on `cy.its("response.body.results")` against an intercepted request, i.e. a
+response-shape/intercept problem in the feed specs, not a rendering problem. They were red before any
+change in this branch and no task covers them.
