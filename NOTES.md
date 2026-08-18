@@ -2,6 +2,24 @@
 
 Written justifications for each change, per the assessment brief.
 
+## Verification
+
+Each issue is one commit. Counts below are from runs of the full suites on the final tree.
+
+| Suite                     | Before any change        | After all four                                    |
+| ------------------------- | ------------------------ | ------------------------------------------------- |
+| `yarn types`              | clean                    | clean                                             |
+| `yarn lint`               | clean                    | clean                                             |
+| `yarn test:unit:ci`       | 44 passed, 10 skipped    | 44 passed, 10 skipped                             |
+| e2e `cypress/tests/api/*` | 51 passed, 0 failed      | **53 passed, 0 failed** (+2 new tests from #1591) |
+| e2e `cypress/tests/ui/*`  | 47 passed, **11 failed** | **48 passed, 10 failed**                          |
+
+The UI suite was already red before any change here. Its 11 pre-existing failures all fail the same
+way — `cy.its("response.body.results")` on an intercepted request, in `notifications.spec.ts` and
+`transaction-feeds.spec.ts`. No issue in this batch covers them and none was "fixed" opportunistically.
+Comparing failure names between the before and after runs: **no new failure was introduced**, and
+`paginates public transaction feed` recovered as a side effect of #1555.
+
 ## #1607 — remove the `cy.request("GET", "/")` workaround from the API specs
 
 **What was wrong.** Every spec in `cypress/tests/api/` opened with a `before()` hook whose own
