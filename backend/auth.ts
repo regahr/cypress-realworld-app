@@ -48,9 +48,12 @@ router.post("/login", passport.authenticate("local"), (req: Request, res: Respon
 
 router.post("/logout", (req: Request, res: Response): void => {
   res.clearCookie("connect.sid");
-  req.logout(() => res.redirect("/"));
-  req.session!.destroy(function (err) {
-    res.redirect("/");
+  // passport 0.5 clears the login state synchronously and ignores this callback; @types/passport is
+  // typed for 0.6+ and requires one. The session teardown below is what actually sends the response.
+  req.logout(() => {});
+  req.session!.destroy(() => {
+    res.status(200);
+    res.json({ message: "Logged out" });
   });
 });
 
