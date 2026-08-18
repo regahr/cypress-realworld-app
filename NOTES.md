@@ -63,3 +63,32 @@ but it is defensive code with a deliberate comment and removing it is outside th
 **Observation, not fixed.** The passport 0.5 runtime versus 0.6-typed `@types/passport` mismatch is a
 real latent trap elsewhere in the codebase; any other `req.logout(cb)` added in future will silently
 never run its callback. Worth an upgrade, but that is a dependency change, not this issue.
+
+## #1591 — add an API-level logout Cypress command
+
+**What the gap was.** There was an API login command (`loginByApi`, `cypress/support/commands.ts:88`)
+but no API logout counterpart. The only way to log out from a test was `logoutByXstate`
+(`commands.ts:182`), which drives the running app: it reaches into `window.authService`, sends the
+XState `LOGOUT` event, and waits for the router to land on `/signin`. That is the wrong tool when a
+test wants to invalidate the _server session_ without tearing down client auth state, and it is
+unusable in the `cypress/tests/api/` specs, which never load the app at all.
+
+**Why this shape.** `logoutByApi` mirrors `loginByApi` exactly — a single `cy.request` to the backend
+resolved through `Cypress.expose("apiUrl")` — and sits directly beside it in both
+`cypress/support/commands.ts` and `cypress/global.d.ts`, because this repo declares command types in
+a separate file and the two must move together. It is deliberately not layered on `logoutByXstate`:
+that command's window/XState/routing mechanics are exactly what an API-level command must avoid.
+
+**What the test proves.** `cypress/tests/api/api-auth.spec.ts` asserts more than a 200. The first test
+pins the response contract (`200`, `{ message: "Logged out" }`); the second proves the security
+property that the issue actually asks for — after `logoutByApi()`, a follow-up request to
+`GET /checkAuth` returns `401`, i.e. the server session is genuinely invalidated rather than the
+client merely forgetting about it.
+
+**Dependency.** This command is only meaningful because of #1592; against the previous handler it
+would have asserted a 404. The two are separate commits, but #1591's test is what verifies #1592's
+behaviour end to end.
+
+**What I deliberately did not touch.** `loginByApi`, `logoutByXstate`, `switchUserByXstate`, and every
+existing spec. No existing test was modified to use the new command — adding it is the issue; adopting
+it everywhere is not.

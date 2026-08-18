@@ -106,6 +106,11 @@ declare namespace Cypress {
     loginByApi(username: string, password?: string): Chainable<Response>;
 
     /**
+     * Logs out the current user via the API, invalidating the server session
+     */
+    logoutByApi(): Chainable<Response>;
+
+    /**
      * Logs-in user by using Google API request
      */
     loginByGoogleApi(): Chainable<Response>;

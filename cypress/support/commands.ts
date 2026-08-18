@@ -97,6 +97,10 @@ Cypress.Commands.add("loginByApi", (username, password) => {
     : cy.env(["defaultPassword"]).then(({ defaultPassword }) => sendLogin(defaultPassword));
 });
 
+Cypress.Commands.add("logoutByApi", () => {
+  return cy.request("POST", `${Cypress.expose("apiUrl")}/logout`);
+});
+
 Cypress.Commands.add("reactComponent", { prevSubject: "element" }, ($el) => {
   if ($el.length !== 1) {
     throw new Error(`cy.component() requires element of length 1 but got ${$el.length}`);
